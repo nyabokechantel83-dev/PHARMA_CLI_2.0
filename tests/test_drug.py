@@ -11,7 +11,13 @@ Plain-English summary:
 
 import pytest
 
+from models import drug
 from models.drug import add_drug, list_drugs, get_drug
+
+
+@pytest.fixture(autouse=True)
+def clear_store():
+    drug._store.drugs.clear()
 
 
 def test_add_drug_creates_a_drug_with_correct_details():
