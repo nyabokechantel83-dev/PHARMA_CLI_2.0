@@ -13,13 +13,13 @@ import pytest
 from models.drug import add_drug
 from models.order import place_order
 
+class TestPlaceOrder:
+    def test_ordering_a_non_prescription_drug_confirms_instantly(customer):
+        drug = add_drug(name="Panadol", price=50, stock=20, requires_prescription=False)
 
-def test_ordering_a_non_prescription_drug_confirms_instantly(customer):
-    drug = add_drug(name="Panadol", price=50, stock=20, requires_prescription=False)
+        order = place_order(customer=customer, drug_id=drug.id)
 
-    order = place_order(customer=customer, drug_id=drug.id)
-
-    assert order.status == "confirmed"
+        assert order.status == "confirmed"
 
 
 def test_ordering_a_prescription_drug_with_a_ref_is_pending(customer):
