@@ -11,7 +11,7 @@ class Order:
         self.created_at = date.today()
 
     def __repr__(self):
-        return f"Order(id={self.id!r}, status={self.status!r}, drug_id={self.drug_id!r}"  
+        return f"Order(id={self.id!r}, status={self.status!r}, drug_id={self.drug_id!r}" 
 
 class OrderServices:
     def __init__(self, drug_services, prescription_services):
@@ -63,11 +63,11 @@ class OrderServices:
     def decide(self, order_id, approve):
         order = self.get_order(order_id)
         if order.status != "pending":
-            raise ValueError(f"Order '{order_id}'(status: {order.status}).")
+            raise ValueError(f"Order '{order_id}' is not pending(status: {order.status}).")
 
         if approve:
             order.status = "approved"
-            drug = self._drug_services.grt_drug(order.drug_id)
+            drug = self._drug_services.get_drug(order.drug_id)
             drug.stock -= 1
 
             if order.prescription_ref:
