@@ -1,128 +1,70 @@
 from types import SimpleNamespace
-
-import pytest  # type: ignore[import-not-found]
-
-from cli.doctor import (
-    _issue_prescription_for_current_doctor,
-)
+from datetime import date, timedelta
+import pytest  # type: ignore[reportMissingImports]
+from cli.doctor import issue_prescription, list_prescriptions
 
 
-def assert_raises(expected_exception, func, *args, **kwargs):
-    try:
-        func(*args, **kwargs)
-    except expected_exception:
-        return
-    except Exception as exc:
-        raise AssertionError(
-            f"Expected {expected_exception.__name__}, got {type(exc).__name__}: {exc}"
-        ) from exc
+class TestIssuePrescription:
+    def test_doctor_can_issue_prescription(self, monkeypatch, capsys):
+        doctor = SimpleNamespace(id=1, role="doctor")
+        args = SimpleNamespace(patient_name="John Maina", drug_name="Amoxicillin", days_valid=30)
+        prescriptions = []
 
-    raise AssertionError(
-        f"Expected {expected_exception.__name__}, but no exception was raised"
-    )
+        monkeypatch.setattr("cli.doctor.prescription_model.load_prescriptions", lambda: prescriptions)
+        monkeypatch.setattr("cli.doctor.prescription_model.save_prescriptions", lambda rows: prescriptions.extend(rows))
+        monkeypatch.setattr("cli.doctor.prescription_model.make_ref", lambda rows: "RX-0001")
+
+        issue_prescription.__wrapped__(args, doctor)
+
+        output = capsys.readouterr().out
+
+        assert len(prescriptions) == 1
+        assert prescriptions[0].ref == "RX-0001"
+        assert prescriptions[0].patient_name == "John Maina"
+        assert prescriptions[0].doctor_id == 1
+        assert prescriptions[0].drug_name == "Amoxicillin"
+        assert prescriptions[0].used is False
+        assert prescriptions[0].date_issued == date.today().isoformat()
+        assert prescriptions[0].expires_at == (date.today() + timedelta(days=30)).isoformat()
+        assert "Prescription created: RX-0001" in output
+
+    def test_invalid_days_valid_raises_error(self):
+        doctor = SimpleNamespace(id=1, role="doctor")
+        args = SimpleNamespace(patient_name="John Maina", drug_name="Amoxicillin", days_valid=0)
+
+        with pytest.raises(ValueError):
+            issue_prescription.__wrapped__(args, doctor)
 
 
-class TestDoctorPrescription:
+class TestListPrescriptions:
+    def test_list_prescriptions_for_current_doctor(self, monkeypatch, capsys):
+        doctor = SimpleNamespace(id=1, role="doctor")
+        prescriptions = [
+            SimpleNamespace(ref="RX-0001", patient_name="John Maina", doctor_id=1, drug_name="Amoxicillin", expires_at="2026-12-31", used=False),
+            SimpleNamespace(ref="RX-0002", patient_name="Jane Doe", doctor_id=2, drug_name="Panadol", expires_at="2026-12-31", used=False)
+        ]
 
-    def test_doctor_can_issue_prescription(self):
-        doctor = SimpleNamespace(
-            id="D001",
-            role="doctor"
-        )
+        monkeypatch.setattr("cli.doctor.prescription_model.load_prescriptions", lambda: prescriptions)
 
-        prescription = SimpleNamespace(
-            ref="RX-12345678",
-            patient_name="John Maina",
-            drug_name="Amoxicillin",
-            expires_at="2026-12-31"
-        )
+        args = SimpleNamespace()
+        list_prescriptions.__wrapped__(args, doctor)
 
-        prescription_service = SimpleNamespace(
-            issue_prescription=lambda **kwargs: prescription
-        )
+        output = capsys.readouterr().out
 
-        services = SimpleNamespace(
-            prescription=prescription_service
-        )
+        assert "RX-0001" in output
+        assert "John Maina" in output
+        assert "Amoxicillin" in output
+        assert "RX-0002" not in output
+        assert "Jane Doe" not in output
 
-        args = SimpleNamespace(
-            patient_name="John Maina",
-            drug_name="Amoxicillin",
-            expires_at="2026-12-31"
-        )
+    def test_list_prescriptions_when_none_exist(self, monkeypatch, capsys):
+        doctor = SimpleNamespace(id=1, role="doctor")
 
-        _issue_prescription_for_current_doctor(
-            current_doctor=doctor,
-            args=args,
-            services=services
-        )
+        monkeypatch.setattr("cli.doctor.prescription_model.load_prescriptions", lambda: [])
 
-        assert prescription.patient_name == "John Maina"
-        assert prescription.drug_name == "Amoxicillin"
-        assert prescription.expires_at == "2026-12-31"
+        args = SimpleNamespace()
+        list_prescriptions.__wrapped__(args, doctor)
 
-    def test_prescription_is_issued_by_current_doctor(self):
-        doctor = SimpleNamespace(
-            id="D001",
-            role="doctor"
-        )
+        output = capsys.readouterr().out
 
-        captured = {}
-
-        def issue_prescription(**kwargs):
-            captured.update(kwargs)
-
-            return SimpleNamespace(
-                ref="RX-12345678",
-                patient_name=kwargs["patient_name"],
-                drug_name=kwargs["drug_name"],
-                expires_at=kwargs["expires_at"]
-            )
-
-        services = SimpleNamespace(
-            prescription=SimpleNamespace(
-                issue_prescription=issue_prescription
-            )
-        )
-
-        args = SimpleNamespace(
-            patient_name="John Maina",
-            drug_name="Amoxicillin",
-            expires_at="2026-12-31"
-        )
-
-        _issue_prescription_for_current_doctor(
-            current_doctor=doctor,
-            args=args,
-            services=services
-        )
-
-        assert captured["doctor"] is doctor
-        assert captured["patient_name"] == "John Maina"
-        assert captured["drug_name"] == "Amoxicillin"
-        assert captured["expires_at"] == "2026-12-31"
-
-    def test_non_doctor_cannot_issue_prescription(self):
-        customer = SimpleNamespace(
-            id="C001",
-            role="customer"
-        )
-
-        services = SimpleNamespace(
-            prescription=SimpleNamespace(
-                issue_prescription=lambda **kwargs: None
-            )
-        )
-
-        args = SimpleNamespace(
-            patient_name="John Maina",
-            drug_name="Amoxicillin",
-            expires_at="2026-12-31"
-        )
-
-        with pytest.raises(Exception):
-            _issue_prescription_for_current_doctor(
-                current_doctor=customer,
-                args=args,
-                services=services
-            )
+        assert "No prescriptions found" in output

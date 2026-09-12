@@ -1,13 +1,5 @@
-"""
-Tests for models/order.py — a customer placing an order.
 
-summary:
-- Ordering a normal (non-prescription) drug confirms right away.
-- Ordering a prescription drug needs a prescription ref and starts
-  out "pending" instead of "confirmed".
-- Ordering a prescription drug WITHOUT a ref should fail clearly.
-"""
-
+# pyright: reportMissingImports=false
 import pytest
 
 from models.drug import add_drug
