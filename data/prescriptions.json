@@ -1,0 +1,26 @@
+[
+    {
+        "ref": "RX-1001",
+        "patient_name": "John Maina",
+        "drug_name": "Amoxicillin",
+        "doctor_id": "doctor-1",
+        "expires_at": "2026-12-31",
+        "used": false
+    },
+    {
+        "ref": "RX-1002",
+        "patient_name": "John Maina",
+        "drug_name": "Amoxicillin",
+        "doctor_id": "doctor-1",
+        "expires_at": "2026-12-31",
+        "used": false
+    },
+    {
+        "ref": "RX-1003",
+        "patient_name": "Customer 3",
+        "drug_name": "Amoxicillin",
+        "doctor_id": "doctor-1",
+        "expires_at": "2026-12-31",
+        "used": false
+    }
+]
