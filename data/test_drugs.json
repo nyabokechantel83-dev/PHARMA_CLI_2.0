@@ -1,0 +1,10 @@
+[
+    {
+        "id": "1",
+        "name": "Panadol",
+        "price": 50,
+        "stock": 30,
+        "requires_prescription": false,
+        "category": null
+    }
+]
