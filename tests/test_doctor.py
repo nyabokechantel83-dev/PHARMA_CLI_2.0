@@ -3,18 +3,19 @@ from datetime import date, timedelta
 import pytest  # type: ignore[reportMissingImports]
 from cli.doctor import issue_prescription, list_prescriptions
 
-
 class TestIssuePrescription:
     def test_doctor_can_issue_prescription(self, monkeypatch, capsys):
         doctor = SimpleNamespace(id=1, role="doctor")
         args = SimpleNamespace(patient_name="John Maina", drug_name="Amoxicillin", days_valid=30)
-        prescriptions = []
+        saved = {}
 
-        monkeypatch.setattr("cli.doctor.prescription_model.load_prescriptions", lambda: prescriptions)
-        monkeypatch.setattr("cli.doctor.prescription_model.save_prescriptions", lambda rows: prescriptions.extend(rows))
+        monkeypatch.setattr("cli.doctor.prescription_model.load_prescriptions", lambda: [])
+        monkeypatch.setattr("cli.doctor.prescription_model.save_prescriptions", lambda rows: saved.setdefault("rows", rows))
         monkeypatch.setattr("cli.doctor.prescription_model.make_ref", lambda rows: "RX-0001")
 
         issue_prescription.__wrapped__(args, doctor)
+
+        prescriptions = saved["rows"]
 
         output = capsys.readouterr().out
 
@@ -34,7 +35,6 @@ class TestIssuePrescription:
 
         with pytest.raises(ValueError):
             issue_prescription.__wrapped__(args, doctor)
-
 
 class TestListPrescriptions:
     def test_list_prescriptions_for_current_doctor(self, monkeypatch, capsys):
@@ -67,4 +67,4 @@ class TestListPrescriptions:
 
         output = capsys.readouterr().out
 
-        assert "No prescriptions found" in output
+        assert "not written any prescriptions" in output
