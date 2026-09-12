@@ -17,7 +17,7 @@ summary for otc_advisory():
 from models.prescription import issue_prescription
 from models.drug import add_drug
 from models.order import place_order
-from utils.verify import verify_prescription, otc_advisory
+from Auth.login import verify_prescription, otc_advisory
 
 
 def test_verify_prescription_returns_not_found_for_a_fake_ref():
