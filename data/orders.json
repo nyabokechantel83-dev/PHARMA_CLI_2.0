@@ -1,0 +1,52 @@
+[
+  {
+    "id": "order-1",
+    "customer_id": "customer-1",
+    "drug_id": "drug-1",
+    "category": "otc",
+    "prescription_ref": null,
+    "status": "confirmed",
+    "verification_status": null,
+    "created_at": "2026-09-01"
+  },
+  {
+    "id": "order-2",
+    "customer_id": "customer-2",
+    "drug_id": "drug-2",
+    "category": "prescription",
+    "prescription_ref": "RX-1001",
+    "status": "pending",
+    "verification_status": null,
+    "created_at": "2026-09-03"
+  },
+  {
+    "id": "order-3",
+    "customer_id": "customer-1",
+    "drug_id": "drug-3",
+    "category": "prescription",
+    "prescription_ref": "RX-1002",
+    "status": "approved",
+    "verification_status": "verified",
+    "created_at": "2026-09-05"
+  },
+  {
+    "id": "order-4",
+    "customer_id": "customer-3",
+    "drug_id": "drug-2",
+    "category": "prescription",
+    "prescription_ref": "RX-1003",
+    "status": "rejected",
+    "verification_status": "flagged",
+    "created_at": "2026-09-07"
+  },
+  {
+    "id": "order-5",
+    "customer_id": "customer-2",
+    "drug_id": "drug-4",
+    "category": "otc",
+    "prescription_ref": null,
+    "status": "confirmed",
+    "verification_status": null,
+    "created_at": "2026-09-10"
+  }
+]
