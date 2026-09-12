@@ -8,7 +8,7 @@ Plain-English summary:
 - We can look a prescription up later by its reference code.
 """
 
-import pytest
+import pytest  # type: ignore[import-not-found]
 
 from models.prescription import issue_prescription, get_prescription
 

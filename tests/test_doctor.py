@@ -1,10 +1,25 @@
 from types import SimpleNamespace
 
-import pytest
+import pytest  # type: ignore[import-not-found]
 
 from cli.doctor import (
     _issue_prescription_for_current_doctor,
 )
+
+
+def assert_raises(expected_exception, func, *args, **kwargs):
+    try:
+        func(*args, **kwargs)
+    except expected_exception:
+        return
+    except Exception as exc:
+        raise AssertionError(
+            f"Expected {expected_exception.__name__}, got {type(exc).__name__}: {exc}"
+        ) from exc
+
+    raise AssertionError(
+        f"Expected {expected_exception.__name__}, but no exception was raised"
+    )
 
 
 class TestDoctorPrescription:
