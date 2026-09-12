@@ -1,6 +1,13 @@
 {
     "cSpell.words": [
+        "certifi",
+        "idna",
+        "iniconfig",
         "Njuguna",
-        "Panadol"
+        "Panadol",
+        "pluggy",
+        "Pygments",
+        "pytest",
+        "urllib"
     ]
 }

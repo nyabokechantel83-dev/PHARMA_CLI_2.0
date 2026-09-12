@@ -17,73 +17,74 @@ summary for otc_advisory():
 from models.prescription import issue_prescription
 from models.drug import add_drug
 from models.order import place_order
-from Auth.login import verify_prescription, otc_advisory
+from utils.verify import verify_prescription, otc_advisory
 
 
-def test_verify_prescription_returns_not_found_for_a_fake_ref():
-    status = verify_prescription(ref="RX-FAKE-000", drug_name="Amoxicillin")
+class testVerifyPrescription:
 
-    assert status == "not_found"
+    def test_verify_prescription_returns_not_found_for_a_fake_ref():
+        status = verify_prescription(ref="RX-FAKE-000", drug_name="Amoxicillin")
+
+        assert status == "not_found"
 
 
-def test_verify_prescription_returns_expired_for_an_old_prescription(doctor):
-    prescription = issue_prescription(
+    def test_verify_prescription_returns_expired_for_an_old_prescription(doctor):
+        prescription = issue_prescription(
         doctor=doctor,
         patient_name="Josephine Njuguna",
         drug_name="Amoxicillin",
         expires_at="2026-01-01", 
     )
 
-    status = verify_prescription(ref=prescription.ref, drug_name="Amoxicillin")
+        status = verify_prescription(ref=prescription.ref, drug_name="Amoxicillin")
 
-    assert status == "expired"
+        assert status == "expired"
 
 
-def test_verify_prescription_returns_verified_for_a_good_prescription(doctor):
-    prescription = issue_prescription(
+    def test_verify_prescription_returns_verified_for_a_good_prescription(doctor):
+        prescription = issue_prescription(
         doctor=doctor,
         patient_name="Josephine Njuguna",
         drug_name="Amoxicillin",
         expires_at="2030-01-01", 
     )
 
-    status = verify_prescription(ref=prescription.ref, drug_name="Amoxicillin")
+        status = verify_prescription(ref=prescription.ref, drug_name="Amoxicillin")
 
-    assert status == "verified"
+        assert status == "verified"
 
 
-def test_verify_prescription_returns_already_used_after_approval(doctor):
-    prescription = issue_prescription(
+    def test_verify_prescription_returns_already_used_after_approval(doctor):
+        prescription = issue_prescription(
         doctor=doctor,
         patient_name="Josephine Njuguna",
         drug_name="Amoxicillin",
         expires_at="2030-01-01",
     )
-    prescription.used = True  
+        prescription.used = True
 
-    status = verify_prescription(ref=prescription.ref, drug_name="Amoxicillin")
+        status = verify_prescription(ref=prescription.ref, drug_name="Amoxicillin")
 
-    assert status == "already_used"
+        assert status == "already_used"
+
+class TestOtcAdvisory:
+    def test_otc_advisory_is_silent_under_the_threshold(customer):
+        drug = add_drug(name="Panadol", price=50, stock=20, requires_prescription=False, category="analgesic")
+
+        place_order(customer=customer, drug_id=drug.id)
+
+        message = otc_advisory(customer_id=customer.id, category="analgesic")
+
+        assert message is None
 
 
-def test_otc_advisory_is_silent_under_the_threshold(customer):
-    drug = add_drug(name="Panadol", price=50, stock=20, requires_prescription=False, category="analgesic")
+    def test_otc_advisory_fires_after_repeated_purchases(customer):
+        drug = add_drug(name="Panadol", price=50, stock=20, requires_prescription=False, category="analgesic")
 
-    place_order(customer=customer, drug_id=drug.id)  
+        place_order(customer=customer, drug_id=drug.id)
+        place_order(customer=customer, drug_id=drug.id)
+        place_order(customer=customer, drug_id=drug.id)
 
-    message = otc_advisory(customer_id=customer.id, category="analgesic")
+        message = otc_advisory(customer_id=customer.id, category="analgesic")
 
-    assert message is None
-
-
-def test_otc_advisory_fires_after_repeated_purchases(customer):
-    drug = add_drug(name="Panadol", price=50, stock=20, requires_prescription=False, category="analgesic")
-
-    
-    place_order(customer=customer, drug_id=drug.id)
-    place_order(customer=customer, drug_id=drug.id)
-    place_order(customer=customer, drug_id=drug.id)
-
-    message = otc_advisory(customer_id=customer.id, category="analgesic")
-
-    assert message is not None
+        assert message is not None
