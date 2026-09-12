@@ -1,0 +1,18 @@
+[
+    {
+        "id": "1",
+        "name": "Panadol",
+        "price": 50,
+        "stock": 20,
+        "requires_prescription": false,
+        "category": "analgesic"
+    },
+    {
+        "id": "2",
+        "name": "Amoxicillin",
+        "price": 150,
+        "stock": 10,
+        "requires_prescription": true,
+        "category": "antibiotic"
+    }
+]
