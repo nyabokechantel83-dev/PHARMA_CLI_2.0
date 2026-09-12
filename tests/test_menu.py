@@ -246,7 +246,7 @@ def test_every_pharmacist_menu_option_runs(answer_with, pharmacist_user, capsys)
 
     printed = capsys.readouterr().out
     assert "Panadol" in printed
-    assert "New stock: 10" in printed
+    assert "now has 10 units" in printed
     assert "Nothing to flag" in printed
     assert "Logged out" in printed
 
@@ -276,7 +276,7 @@ def test_every_doctor_menu_option_runs(answer_with, doctor_user, capsys):
     answer_with(["2", "4"])
 
     assert main([]) == 0
-    assert "not written any prescriptions" in capsys.readouterr().out
+    assert "No prescriptions found" in capsys.readouterr().out
 
 
 def test_reviewing_claims_without_deciding(answer_with, pharmacist_user, capsys):

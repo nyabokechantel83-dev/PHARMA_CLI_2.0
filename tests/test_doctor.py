@@ -67,4 +67,4 @@ class TestListPrescriptions:
 
         output = capsys.readouterr().out
 
-        assert "not written any prescriptions" in output
+        assert "No prescriptions found" in output
