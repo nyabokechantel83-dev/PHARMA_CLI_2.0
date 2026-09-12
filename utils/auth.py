@@ -88,8 +88,16 @@ def current_user():
     if not path.exists():
         return None
 
-    with open(path, "r", encoding="utf-8") as file:
-        session = json.load(file)
+    try:
+        with open(path, "r", encoding="utf-8") as file:
+            session = json.load(file)
+    except (json.JSONDecodeError, OSError):
+        return None
+
+    # A stale or hand-edited session file should log you out, not crash
+    # the whole app on the way into the menu.
+    if not isinstance(session, dict) or "user_id" not in session:
+        return None
 
     return user_model.find_by_id(session["user_id"])
 
