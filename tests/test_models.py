@@ -61,6 +61,25 @@ def test_order_survives_a_trip_through_a_dictionary():
     assert Order.from_dict(original.to_dict()) == original
 
 
+def _prescription_with_ref(ref):
+    return Prescription(
+        ref=ref,
+        patient_name="Ann",
+        doctor_id=2,
+        drug_name="Amoxicillin",
+        date_issued="2026-01-01",
+        expires_at="2026-02-01",
+        used=False,
+    )
+
+
 def test_prescription_references_are_numbered_and_padded():
     assert make_ref([]) == "RX-0001"
-    assert make_ref([1, 2, 3]) == "RX-0004"
+
+    existing = [_prescription_with_ref(r) for r in ("RX-0001", "RX-0002", "RX-0003")]
+    assert make_ref(existing) == "RX-0004"
+
+
+def test_prescription_reference_continues_past_gaps():
+    existing = [_prescription_with_ref(r) for r in ("RX-0001", "RX-0007")]
+    assert make_ref(existing) == "RX-0008"

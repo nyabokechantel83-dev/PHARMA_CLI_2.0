@@ -1,139 +1,73 @@
-from models.prescription import Prescription,load_prescriptions,save_prescriptions,find_by_ref,make_ref
+from dataclasses import dataclass, asdict
+from datetime import date
 
-def test_prescription_to_dict():
-    prescription=Prescription(
-        ref="RX-0001",
-        patient_name="John Maina",
-        doctor_id=1,
-        drug_name="Amoxicillin",
-        date_issued="2026-09-12",
-        expires_at="2026-12-31",
-        used=False
-    )
-    data=prescription.to_dict()
-    assert data["ref"]=="RX-0001"
-    assert data["patient_name"]=="John Maina"
-    assert data["doctor_id"]==1
-    assert data["drug_name"]=="Amoxicillin"
-    assert data["date_issued"]=="2026-09-12"
-    assert data["expires_at"]=="2026-12-31"
-    assert data["used"] is False
+from utils import storage
 
-def test_prescription_from_dict():
-    data={
-        "ref":"RX-0002",
-        "patient_name":"Jane Doe",
-        "doctor_id":2,
-        "drug_name":"Panadol",
-        "date_issued":"2026-09-12",
-        "expires_at":"2026-12-31",
-        "used":False
-    }
-    prescription=Prescription.from_dict(data)
-    assert prescription.ref=="RX-0002"
-    assert prescription.patient_name=="Jane Doe"
-    assert prescription.doctor_id==2
-    assert prescription.drug_name=="Panadol"
-    assert prescription.used is False
+FILE_NAME = "prescriptions.json"
 
-def test_save_and_load_prescriptions(monkeypatch):
-    data=[]
-    monkeypatch.setattr(
-        "models.prescription.storage.write_json",
-        lambda file_name,rows:data.extend(rows)
-    )
-    monkeypatch.setattr(
-        "models.prescription.storage.read_json",
-        lambda file_name:data
-    )
 
-    prescription=Prescription(
-        ref="RX-0003",
-        patient_name="John Maina",
-        doctor_id=1,
-        drug_name="Amoxicillin",
-        date_issued="2026-09-12",
-        expires_at="2026-12-31",
-        used=False
-    )
+@dataclass
+class Prescription:
+    ref: str
+    patient_name: str
+    doctor_id: int
+    drug_name: str
+    date_issued: str
+    expires_at: str
+    used: bool = False
 
-    save_prescriptions([prescription])
-    loaded=load_prescriptions()
+    def to_dict(self):
+        return asdict(self)
 
-    assert len(loaded)==1
-    assert loaded[0].ref=="RX-0003"
-    assert loaded[0].patient_name=="John Maina"
-    assert loaded[0].drug_name=="Amoxicillin"
+    @staticmethod
+    def from_dict(row):
+        return Prescription(**row)
 
-def test_find_by_ref(monkeypatch):
-    prescription=Prescription(
-        ref="RX-0004",
-        patient_name="John Maina",
-        doctor_id=1,
-        drug_name="Amoxicillin",
-        date_issued="2026-09-12",
-        expires_at="2026-12-31",
-        used=False
+def load_prescriptions():
+    data = storage.read_json(FILE_NAME)
+    return [Prescription.from_dict(item) for item in data]
+
+def save_prescriptions(prescriptions):
+    data = [p.to_dict() for p in prescriptions]
+    storage.write_json(FILE_NAME, data)
+
+def find_by_ref(ref):
+    prescriptions = load_prescriptions()
+    for p in prescriptions:
+        if p.ref.lower() == ref.lower():
+            return p
+    return None
+
+def make_ref(prescriptions):
+    if not prescriptions:
+        return "RX-0001"
+    
+    nums = [int(p.ref.split("-")[1]) for p in prescriptions]
+    new_num = max(nums) + 1
+    return f"RX-{new_num:04d}"
+
+def issue_prescription(doctor, patient_name, drug_name, expires_at):
+    """Write a new prescription and save it. Only a doctor may do this."""
+    if getattr(doctor, "role", None) != "doctor":
+        raise PermissionError("Only a doctor can issue a prescription.")
+
+    prescriptions = load_prescriptions()
+
+    new_prescription = Prescription(
+        ref=make_ref(prescriptions),
+        patient_name=patient_name,
+        doctor_id=doctor.id,
+        drug_name=drug_name,
+        date_issued=date.today().isoformat(),
+        expires_at=expires_at,
+        used=False,
     )
 
-    monkeypatch.setattr(
-        "models.prescription.load_prescriptions",
-        lambda:[prescription]
-    )
+    prescriptions.append(new_prescription)
+    save_prescriptions(prescriptions)
+    return new_prescription
 
-    found=find_by_ref("RX-0004")
-    assert found is prescription
 
-def test_find_by_ref_is_case_insensitive(monkeypatch):
-    prescription=Prescription(
-        ref="RX-0005",
-        patient_name="John Maina",
-        doctor_id=1,
-        drug_name="Amoxicillin",
-        date_issued="2026-09-12",
-        expires_at="2026-12-31",
-        used=False
-    )
-
-    monkeypatch.setattr(
-        "models.prescription.load_prescriptions",
-        lambda:[prescription]
-    )
-
-    found=find_by_ref("rx-0005")
-    assert found is prescription
-
-def test_find_by_ref_returns_none_for_unknown_ref(monkeypatch):
-    monkeypatch.setattr(
-        "models.prescription.load_prescriptions",
-        lambda:[]
-    )
-
-    assert find_by_ref("RX-DOES-NOT-EXIST") is None
-
-def test_make_ref():
-    prescriptions=[
-        Prescription(
-            ref="RX-0001",
-            patient_name="John Maina",
-            doctor_id=1,
-            drug_name="Amoxicillin",
-            date_issued="2026-09-12",
-            expires_at="2026-12-31",
-            used=False
-        ),
-        Prescription(
-            ref="RX-0002",
-            patient_name="Jane Doe",
-            doctor_id=2,
-            drug_name="Panadol",
-            date_issued="2026-09-12",
-            expires_at="2026-12-31",
-            used=False
-        )
-    ]
-
-    assert make_ref(prescriptions)=="RX-0003"
-
-def test_make_ref_empty_list():
-    assert make_ref([])=="RX-0001"
+def get_prescription(ref):
+    """Look a prescription up by its reference code, or None if unknown."""
+    return find_by_ref(ref)
