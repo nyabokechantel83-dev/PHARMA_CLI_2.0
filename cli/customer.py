@@ -42,7 +42,7 @@ def browse(args, user):
     for stored_drug in drugs:
         needs_text = "prescription" if stored_drug.requires_rx else "-"
         print(
-            f"{stored_drug.id:<5} {stored_drug.name:<22} {stored_drug.category:<14} "
+            f"{stored_drug.id:<5} {stored_drug.name:<22} {(stored_drug.category or '-'):<14} "
             f"{stored_drug.price:>8.2f} {stored_drug.stock:>6}  {needs_text}"
         )
 
