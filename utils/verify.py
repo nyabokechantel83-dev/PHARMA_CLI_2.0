@@ -1,41 +1,85 @@
 from datetime import date, timedelta
-class VerificationServices:
-    def __init__(self, prescription_services, order_service):
-        self._prescription_services = prescription_services
-        self._order_services = order_service
 
-    def verify_prescription(self, ref, drug_name):
-        prescription = self._prescription_services.get(ref)
-        if prescription is None:
-            return "not_found"
+from models import order as order_model
+from models import prescription as prescription_model
 
-        if prescription.used:
-            return "already_used"
 
-        if self._is_expired(prescription.expires_at):
-            return "expired"
+VERIFIED = "verified"
+NOT_FOUND = "not_found"
+DRUG_MISMATCH = "drug_mismatch"
+NAME_MISMATCH = "name_mismatch"
+EXPIRED = "expired"
+ALREADY_USED = "already_used"
+NOT_REQUIRED = "not_required"
 
-        return "verified"
 
-    @staticmethod
-    def _is_expired(expires_at):
-        expiry_date = date.fromisoformat(expires_at)
-        return expiry_date < date.today()
+VERIFICATION_MESSAGES = {
+    VERIFIED: "Verified - prescription is valid and unused",
+    NOT_FOUND: "NOT FOUND - no prescription with this reference exists",
+    DRUG_MISMATCH: "MISMATCH - the prescription is for a different drug",
+    NAME_MISMATCH: "MISMATCH - the prescription was issued to a different patient",
+    EXPIRED: "EXPIRED - the prescription is past its expiry date",
+    ALREADY_USED: "ALREADY USED - this prescription was used on an earlier order",
+    NOT_REQUIRED: "Not required - this drug is sold over the counter",
+}
 
-    def otc_advisory(self, customer_id, category, threshold=3, window_days=7):
-        cutoff = date.today() - timedelta(days=window_days)
-        customer_orders = self._order_services.list_orders_for_customer(customer_id)
-        recent_matching_orders = [
-            o for o in customer_orders
-            if o.category == category and o.created_at >= cutoff
-        ]
+ADVISORY_DAYS = 30
+ADVISORY_LIMIT = 3
 
-        if len(recent_matching_orders) >= threshold:
-            return (
-                f"Advisory: {len(recent_matching_orders)} '{category}' purchases "
-                f"in the las {window_days} days. Consider recommending a "
-                f"pharmacist consultation."
-            )
 
+def describe(verification_status):
+    return VERIFICATION_MESSAGES.get(verification_status, verification_status)
+
+
+def check_prescription(ref, drug, customer, today=None):
+    if today is None:
+        today = date.today()
+
+    found = prescription_model.find_by_ref(ref)
+
+    if found is None:
+        return NOT_FOUND
+
+    if found.drug_name.lower() != drug.name.lower():
+        return DRUG_MISMATCH
+
+    if found.patient_name.lower() != customer.name.lower():
+        return NAME_MISMATCH
+
+    if date.fromisoformat(found.expires_at) < today:
+        return EXPIRED
+
+    if found.used:
+        return ALREADY_USED
+
+    return VERIFIED
+
+
+def otc_advisory(customer, drug, today=None):
+    if today is None:
+        today = date.today()
+
+    if drug.requires_rx:
         return None
 
+    window_starts = today - timedelta(days=ADVISORY_DAYS)
+    recent_count = 0
+
+    for past_order in order_model.orders_for_customer(customer.id):
+        if past_order.drug_id != drug.id:
+            continue
+
+        if past_order.status == order_model.STATUS_REJECTED:
+            continue
+
+        if date.fromisoformat(past_order.created_at) >= window_starts:
+            recent_count += 1
+    purchases_including_this_one = recent_count + 1
+
+    if purchases_including_this_one < ADVISORY_LIMIT:
+        return None
+
+    return (
+        f"ADVISORY: {customer.name} has bought {drug.name} "
+        f"{purchases_including_this_one} times in the last {ADVISORY_DAYS} days."
+    )

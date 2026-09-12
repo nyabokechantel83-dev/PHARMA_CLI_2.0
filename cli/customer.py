@@ -1,84 +1,155 @@
+from datetime import date
+
+from models import drug as drug_model
+from models import order as order_model
+from models.order import Order
+from utils import storage, verify
 from utils.auth import requires_role
 
 
-def register_subparser(subparser, services):
-    list_parser = subparser.add_parser("list-drugs", help="List all drugs in the catalog")
-    list_parser.set_defaults(func=lambda args: _list_drugs(args, services))
+def add_commands(subparsers):
+    browse_parser = subparsers.add_parser("browse", help="[customer] Show the drugs on sale")
+    browse_parser.set_defaults(func=browse)
 
-    show_parser = subparser.add_parser("show", help="Show a single drug's details")
-    show_parser.add_argument("drug_id", help="ID of the drug to view")
-    show_parser.set_defaults(func=lambda args: _show_drug(args, services))
-
-    order_parser = subparser.add_parser("Order", help="Order a drug")
-    order_parser.add_argument("drug_id", help="ID of the drug to order")
+    order_parser = subparsers.add_parser("order", help="[customer] Order one unit of a drug")
+    order_parser.add_argument("--drug-id", type=int, required=True, help="Id of the drug")
     order_parser.add_argument(
         "--prescription-ref",
-        dest="prescription_ref",
-        default=None,
-        help="Prescription reference(required for prescription-only drugs)",
+        help="Prescription reference, needed only for prescription drugs",
     )
-    order_parser.set_defaults(func=lambda args: _place_order(args, services))
+    order_parser.set_defaults(func=place_order)
 
+    my_orders_parser = subparsers.add_parser(
+        "my-orders",
+        help="[customer] Show the orders you have placed",
+    )
+    my_orders_parser.set_defaults(func=my_orders)
 
-def _list_drugs(args, services):
-    drugs = services.drug.list_drugs()
-
-    if not drugs:
-        print("No drugs in the catalog yet.")
-        return
-    
-    print(f"{'ID':<10}{'Name':<20}{'Price':<10}{'Stock':<8}{'Rx?':<5}")
-    for drug in drugs:
-        rx_flag = "Yes" if drug.requires_prescription else "No"
-        print(f"{drug.id:<10}{drug.name:<20}{drug.price:<10}{drug.Stock:<8}{rx_flag:<5}")
-        
-
-        print(drug)
-
-
-def _show_drug(args, services):
-    try:
-        drug = services.drug.get_drug(args.drug_id)
-    except ValueError as error:
-        print(f"Error: {error}")
-        return
-    
-    print(f"Name:               {drug.name}")
-    print(f"Price:              {drug.price}")
-    print(f"Stock:              {drug.stock}")
-    print(f"Category:           {getattr(drug, 'category', 'general')}")
-    print(f"Requires prescription:{'Yes' if drug.requires_prescription else 'No'}")
 
 @requires_role("customer")
-def _place_order_for_current_customer(current_customer, args, services):
-    order = services.place_order(
-        customer=current_customer,
-        drug_id=args.drug_id,
-        prescription_ref=args.prescription_ref,
-    )
-    if order.status == "pending":
-        verification_status = services.verify.verify_prescription(
-            ref=order.prescription_ref,
-            drug_name=services.drug.get_drug(order.drug_id).name,
+def browse(args, user):
+    del args, user
+
+    drugs = drug_model.load_drugs()
+
+    if not drugs:
+        print("Nothing is on sale yet.")
+        return
+
+    print(f"{'ID':<5} {'NAME':<22} {'CATEGORY':<14} {'PRICE':>8} {'STOCK':>6}  NEEDS")
+    print("-" * 76)
+
+    for stored_drug in drugs:
+        needs_text = "prescription" if stored_drug.requires_rx else "-"
+        print(
+            f"{stored_drug.id:<5} {stored_drug.name:<22} {stored_drug.category:<14} "
+            f"{stored_drug.price:>8.2f} {stored_drug.stock:>6}  {needs_text}"
         )
-        services.order.set_verification_status(order.id, verification_status)
-        print(f"Order {order.id} is PENDING pharmacist review"
-             (f"Verification status: {verification_status}")
-        )
+
+
+@requires_role("customer")
+def place_order(args, user):
+    chosen_drug = drug_model.find_by_id(args.drug_id)
+
+    if chosen_drug is None:
+        raise ValueError(f"There is no drug with id {args.drug_id}.")
+
+    if chosen_drug.stock < 1:
+        raise ValueError(f"{chosen_drug.name} is out of stock.")
+
+    if chosen_drug.requires_rx:
+        order_prescription_drug(args, user, chosen_drug)
     else:
-        print(f"Order {order.id} CONFIRMED.")
+        order_otc_drug(user, chosen_drug)
 
-        drug = services.drug.get_drug(order.drug_id)
-        advisory = services.verify.otc_advisory(
-            customer_id=current_customer.id,
-            category=drug.category,
+
+def order_prescription_drug(args, user, chosen_drug):
+    if not args.prescription_ref:
+        raise ValueError(
+            f"{chosen_drug.name} needs a prescription. "
+            "Add --prescription-ref RX-0001 to your order."
         )
-        if advisory:
-            print(advisory)
 
-def _place_order(args, services):
-    current_user = services.auth.get_current_user()
-    try:
-        _place_order_for_current_customer(current_customer=current_user, args=args, services=services)
-    except ValueError as error:
-        print(f"Error: {error}")
+   
+    verification_status = verify.check_prescription(
+        args.prescription_ref,
+        chosen_drug,
+        user,
+    )
+
+    orders = order_model.load_orders()
+
+    new_order = Order(
+        id=storage.next_id(orders),
+        customer_id=user.id,
+        drug_id=chosen_drug.id,
+        prescription_ref=args.prescription_ref,
+        status=order_model.STATUS_PENDING,
+        verification_status=verification_status,
+        created_at=date.today().isoformat(),
+    )
+
+    orders.append(new_order)
+    order_model.save_orders(orders)
+
+    print(f"Claim #{new_order.id} created for {chosen_drug.name}.")
+    print(f"  Check result: {verify.describe(verification_status)}")
+    print()
+    print("A pharmacist will review this claim. Nothing has been dispensed yet.")
+
+
+def order_otc_drug(user, chosen_drug):
+    orders = order_model.load_orders()
+
+    advisory_message = verify.otc_advisory(user, chosen_drug)
+
+    new_order = Order(
+        id=storage.next_id(orders),
+        customer_id=user.id,
+        drug_id=chosen_drug.id,
+        prescription_ref=None,
+        status=order_model.STATUS_COMPLETED,
+        verification_status=verify.NOT_REQUIRED,
+        created_at=date.today().isoformat(),
+    )
+
+    orders.append(new_order)
+    order_model.save_orders(orders)
+
+    drugs = drug_model.load_drugs()
+
+    for stored_drug in drugs:
+        if stored_drug.id == chosen_drug.id:
+            stored_drug.stock = stored_drug.stock - 1
+
+    drug_model.save_drugs(drugs)
+
+    print(f"Order #{new_order.id} completed: {chosen_drug.name} - {chosen_drug.price:.2f}")
+
+    if advisory_message is not None:
+        print()
+        print(advisory_message)
+        print("The pharmacist can see this pattern with: advisories")
+
+
+@requires_role("customer")
+def my_orders(args, user):
+    del args
+
+    orders = order_model.orders_for_customer(user.id)
+
+    if not orders:
+        print("You have not placed any orders yet.")
+        return
+
+    print(f"{'ID':<5} {'DRUG':<22} {'DATE':<12} {'STATUS':<11} CHECK")
+    print("-" * 78)
+
+    for order in orders:
+        ordered_drug = drug_model.find_by_id(order.drug_id)
+        drug_name = ordered_drug.name if ordered_drug else "unknown drug"
+
+        print(
+            f"{order.id:<5} {drug_name:<22} {order.created_at:<12} "
+            f"{order.status:<11} {verify.describe(order.verification_status)}"
+        )
