@@ -1,98 +1,118 @@
 import pytest
 
-from models import drug
-from models.drug import add_drug, list_drugs, get_drug
+from models import drug as drug_model
+from models.drug import Drug
 
 
-class TestDrug:
+def make_row(id=1, name="Paracetamol", price=10.0, stock=5, category="painkiller", requires_rx=False):
+    return {
+        "id": id,
+        "name": name,
+        "price": price,
+        "stock": stock,
+        "category": category,
+        "requires_rx": requires_rx,
+    }
 
-    def setup_method(self):
-        drug._store.drugs.clear()
 
-    def test_add_drug_creates_a_drug_with_correct_details(self):
-        drug_item = add_drug(
-            name="Panadol",
-            price=50,
-            stock=20,
-            requires_prescription=False,
-            category="analgesic",
-        )
+class TestDrugDataclass:
+    def test_to_dict_returns_plain_dict(self):
+        drug = Drug(id=1, name="Ibuprofen", price=5.5, stock=20, category="painkiller", requires_rx=False)
+        assert drug.to_dict() == {
+            "id": 1,
+            "name": "Ibuprofen",
+            "price": 5.5,
+            "stock": 20,
+            "category": "painkiller",
+            "requires_rx": False,
+        }
 
-        assert drug_item.name == "Panadol"
-        assert drug_item.price == 50
-        assert drug_item.stock == 20
-        assert drug_item.requires_prescription is False
+    def test_from_dict_builds_matching_drug(self):
+        row = make_row(id=2, name="Amoxicillin", requires_rx=True)
+        drug = Drug.from_dict(row)
+        assert drug.id == 2
+        assert drug.name == "Amoxicillin"
+        assert drug.requires_rx is True
 
-    def test_add_drug_rejects_a_zero_or_negative_price(self):
-        with pytest.raises(ValueError):
-            add_drug(
-                name="Panadol",
-                price=0,
-                stock=10,
-                requires_prescription=False
-            )
+    def test_round_trip_through_dict(self):
+        original = Drug(id=3, name="Vitamin C", price=3.0, stock=100, category="supplement", requires_rx=False)
+        rebuilt = Drug.from_dict(original.to_dict())
+        assert rebuilt == original
 
-        with pytest.raises(ValueError):
-            add_drug(
-                name="Panadol",
-                price=-5,
-                stock=10,
-                requires_prescription=False
-            )
 
-    def test_add_drug_rejects_a_zero_or_negative_stock(self):
-        with pytest.raises(ValueError):
-            add_drug(
-                name="Panadol",
-                price=50,
-                stock=0,
-                requires_prescription=False
-            )
+class TestLoadDrugs:
+    def test_returns_drug_objects_from_storage(self, monkeypatch):
+        rows = [make_row(id=1, name="A"), make_row(id=2, name="B")]
+        monkeypatch.setattr(drug_model.storage, "read_json", lambda filename: rows)
 
-        with pytest.raises(ValueError):
-            add_drug(
-                name="Panadol",
-                price=50,
-                stock=-3,
-                requires_prescription=False
-            )
-
-    def test_list_drugs_returns_every_drug_that_was_added(self):
-        add_drug(
-            name="Panadol",
-            price=50,
-            stock=20,
-            requires_prescription=False
-        )
-
-        add_drug(
-            name="Amoxicillin",
-            price=150,
-            stock=10,
-            requires_prescription=True
-        )
-
-        drugs = list_drugs()
+        drugs = drug_model.load_drugs()
 
         assert len(drugs) == 2
+        assert all(isinstance(d, Drug) for d in drugs)
+        assert drugs[0].name == "A"
+        assert drugs[1].name == "B"
 
-        names = [drug.name for drug in drugs]
+    def test_reads_from_correct_file(self, monkeypatch):
+        seen = {}
 
-        assert "Panadol" in names
-        assert "Amoxicillin" in names
+        def fake_read_json(filename):
+            seen["filename"] = filename
+            return []
 
-    def test_get_drug_returns_the_matching_drug(self):
-        added = add_drug(
-            name="Panadol",
-            price=50,
-            stock=20,
-            requires_prescription=False
+        monkeypatch.setattr(drug_model.storage, "read_json", fake_read_json)
+        drug_model.load_drugs()
+        assert seen["filename"] == drug_model.FILE_NAME
+
+    def test_empty_storage_returns_empty_list(self, monkeypatch):
+        monkeypatch.setattr(drug_model.storage, "read_json", lambda filename: [])
+        assert drug_model.load_drugs() == []
+
+
+class TestSaveDrugs:
+    def test_writes_drugs_as_dicts(self, monkeypatch):
+        saved = {}
+        monkeypatch.setattr(
+            drug_model.storage,
+            "write_json",
+            lambda filename, rows: saved.update(filename=filename, rows=rows),
         )
 
-        found = get_drug(added.id)
+        drugs = [
+            Drug(id=1, name="A", price=1.0, stock=1, category="general", requires_rx=False),
+            Drug(id=2, name="B", price=2.0, stock=2, category="general", requires_rx=True),
+        ]
+        drug_model.save_drugs(drugs)
 
-        assert found.name == "Panadol"
+        assert saved["filename"] == drug_model.FILE_NAME
+        assert saved["rows"] == [drug.to_dict() for drug in drugs]
 
-    def test_get_drug_raises_a_clean_error_for_an_unknown_id(self):
-        with pytest.raises(ValueError):
-            get_drug("does-not-exist")
+    def test_writes_empty_list(self, monkeypatch):
+        saved = {}
+        monkeypatch.setattr(
+            drug_model.storage,
+            "write_json",
+            lambda filename, rows: saved.update(filename=filename, rows=rows),
+        )
+        drug_model.save_drugs([])
+        assert saved["rows"] == []
+
+
+class TestFindById:
+    def test_returns_matching_drug(self, monkeypatch):
+        drugs = [Drug(**make_row(id=1)), Drug(**make_row(id=2, name="Other"))]
+        monkeypatch.setattr(drug_model, "load_drugs", lambda: drugs)
+
+        found = drug_model.find_by_id(2)
+
+        assert found is not None
+        assert found.name == "Other"
+
+    def test_returns_none_when_not_found(self, monkeypatch):
+        drugs = [Drug(**make_row(id=1))]
+        monkeypatch.setattr(drug_model, "load_drugs", lambda: drugs)
+
+        assert drug_model.find_by_id(999) is None
+
+    def test_returns_none_when_no_drugs(self, monkeypatch):
+        monkeypatch.setattr(drug_model, "load_drugs", lambda: [])
+        assert drug_model.find_by_id(1) is None
