@@ -1,18 +1,98 @@
 [
-    {
-        "id": "1",
-        "name": "Panadol",
-        "price": 50,
-        "stock": 20,
-        "requires_prescription": false,
-        "category": "analgesic"
-    },
-    {
-        "id": "2",
-        "name": "Amoxicillin",
-        "price": 150,
-        "stock": 10,
-        "requires_prescription": true,
-        "category": "antibiotic"
-    }
+  {
+    "id": 1,
+    "name": "Panadol",
+    "price": 50,
+    "stock": 19,
+    "category": "analgesic",
+    "requires_rx": false
+  },
+  {
+    "id": 2,
+    "name": "Amoxicillin",
+    "price": 150,
+    "stock": 9,
+    "category": "antibiotic",
+    "requires_rx": true
+  },
+  {
+    "id": 3,
+    "name": "Ibuprofen",
+    "price": 80,
+    "stock": 29,
+    "category": "analgesic",
+    "requires_rx": false
+  },
+  {
+    "id": 4,
+    "name": "Cetirizine",
+    "price": 120,
+    "stock": 25,
+    "category": "antihistamine",
+    "requires_rx": false
+  },
+  {
+    "id": 5,
+    "name": "ORS Sachets",
+    "price": 35,
+    "stock": 40,
+    "category": "rehydration",
+    "requires_rx": false
+  },
+  {
+    "id": 6,
+    "name": "Ciprofloxacin",
+    "price": 220,
+    "stock": 12,
+    "category": "antibiotic",
+    "requires_rx": true
+  },
+  {
+    "id": 7,
+    "name": "Metformin",
+    "price": 300,
+    "stock": 18,
+    "category": "antidiabetic",
+    "requires_rx": true
+  },
+  {
+    "id": 8,
+    "name": "Amlodipine",
+    "price": 260,
+    "stock": 15,
+    "category": "cardiac",
+    "requires_rx": true
+  },
+  {
+    "id": 9,
+    "name": "Diazepam",
+    "price": 400,
+    "stock": 8,
+    "category": "sedative",
+    "requires_rx": true
+  },
+  {
+    "id": 10,
+    "name": "Codeine Syrup",
+    "price": 450,
+    "stock": 6,
+    "category": "opioid",
+    "requires_rx": true
+  },
+  {
+    "id": 11,
+    "name": "al",
+    "price": 130.0,
+    "stock": 12,
+    "category": "antimalarial",
+    "requires_rx": true
+  },
+  {
+    "id": 12,
+    "name": "piriton",
+    "price": 20.0,
+    "stock": 50,
+    "category": "flu",
+    "requires_rx": false
+  }
 ]
