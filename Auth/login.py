@@ -28,7 +28,7 @@ class Login:
             }
 
         try:
-            with open("data/user.json", "r") as file:
+            with open("data/users.json", "r") as file:
                 users = json.load(file)
 
         except FileNotFoundError:
