@@ -85,7 +85,7 @@ class Registration:
             return error
 
         try:
-            with open("data/user.json", "r") as file:
+            with open("data/users.json", "r") as file:
                 users = json.load(file)
 
                 if not isinstance(users, list):
@@ -113,7 +113,7 @@ class Registration:
 
         users.append(new_user)
 
-        with open("data/user.json", "w") as file:
+        with open("data/users.json", "w") as file:
             json.dump(users, file, indent=4)
 
         return "User registered successfully"
