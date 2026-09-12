@@ -1,3 +1,6 @@
+
+# pyright: reportMissingImports=false
+import pytest
 from models.order import (
     Order,
     load_orders,
